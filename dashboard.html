@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>FAYIS Attendance — Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><img src="logo.png" class="logo" onerror="this.style.display='none'"> FAYIS Attendance — Admin</div>
+    <div class="top-actions">
+      <button class="btn ghost" id="logoutBtn">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card dashboard-grid">
+      <div class="stat card">
+        <div class="stat-num" id="totalStaff">0</div>
+        <div class="stat-label">Registered staff</div>
+      </div>
+
+      <div class="stat card">
+        <div class="stat-num" id="todayAttendance">0</div>
+        <div class="stat-label">Attendance today</div>
+      </div>
+
+      <div class="stat card">
+        <div class="stat-num" id="lateCount">0</div>
+        <div class="stat-label">Late today</div>
+      </div>
+
+      <div class="actions card">
+        <button class="btn primary" onclick="location.href='register.html'">Register Staff</button>
+        <button class="btn primary" onclick="location.href='attendance.html'">Take Attendance</button>
+        <button class="btn ghost" onclick="location.href='report.html'">Monthly Reports</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Recent attendance (today)</h3>
+      <div id="recentList">Loading...</div>
+    </section>
+  </main>
+
+  <script src="db.js"></script>
+  <script>
+    async function refreshDashboard() {
+      const staff = await DB.getAllStaff();
+      document.getElementById('totalStaff').textContent = staff.length;
+
+      const today = new Date().toISOString().slice(0,10);
+      const att = await DB.getAttendanceByDate(today);
+      document.getElementById('todayAttendance').textContent = att.length;
+      const late = att.filter(a => a.status === 'Late').length;
+      document.getElementById('lateCount').textContent = late;
+
+      const list = document.getElementById('recentList');
+      if (!att.length) { list.innerHTML = '<div class="small muted">No attendance yet today</div>'; return; }
+      list.innerHTML = att.slice(-10).reverse().map(a => {
+        return `<div class="row small">
+          <div style="flex:1"><strong>${a.name}</strong> <span class="muted">(${a.staffCode})</span></div>
+          <div>${a.time}</div>
+        </div>`;
+      }).join('');
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', ()=> {
+      window.location.href = 'index.html';
+    });
+
+    // init DB then refresh
+    (async ()=> {
+      await DB.open();
+      refreshDashboard();
+    })();
+  </script>
+</body>
+</html>

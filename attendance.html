@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>FAYIS Attendance — Live Capture</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>Live attendance</div>
+    <div><button class="btn ghost" onclick="location.href='dashboard.html'">Back</button></div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h3>Camera</h3>
+      <div class="cam-wrap">
+        <video id="liveVideo" autoplay muted playsinline></video>
+        <canvas id="snapCanvas" style="display:none"></canvas>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="startBtn" class="btn primary">Start Camera</button>
+        <button id="stopBtn" class="btn ghost" disabled>Stop</button>
+        <button id="captureNow" class="btn primary" disabled>Capture / Recognize</button>
+      </div>
+
+      <div id="resultBox" style="margin-top:12px"></div>
+    </section>
+  </main>
+
+  <script src="face-recognition.js"></script>
+  <script src="db.js"></script>
+  <script src="attendance.js"></script>
+  <script>
+    (async ()=> {
+      await DB.open();
+      await FaceAPI.loadModels();
+      Attendance.init();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>FAYIS Attendance — Register Staff</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>Register staff</div>
+    <div><button class="btn ghost" onclick="location.href='dashboard.html'">Back</button></div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h3>Staff details</h3>
+      <label class="field"><span class="label">Full name</span><input id="name" /></label>
+      <label class="field"><span class="label">Role / Dept</span><input id="role" /></label>
+
+      <div class="field">
+        <span class="label">Capture face samples (3 samples recommended)</span>
+        <div class="cam-wrap">
+          <video id="regVideo" autoplay muted playsinline></video>
+          <canvas id="regCanvas" style="display:none"></canvas>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button id="captureBtn" class="btn primary">Capture Sample</button>
+          <button id="saveBtn" class="btn primary" disabled>Save Staff</button>
+        </div>
+
+        <div id="samples" class="samples"></div>
+        <p class="muted small">Tip: capture 3 clear samples at slightly different angles.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="face-recognition.js"></script>
+  <script src="db.js"></script>
+  <script src="register.js"></script>
+  <script>
+    (async ()=> {
+      await DB.open();
+      await FaceAPI.loadModels();
+      await Register.init();
+    })();
+  </script>
+</body>
+</html>

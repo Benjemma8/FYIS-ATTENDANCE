@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FATIMA YAHAYA INTERNATIONAL SCHOOL Attendance — Admin Login</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="center">
+    <div class="card login-card">
+      <img src="logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
+      <h1>FATIMA YAHAYA INTERNATIONAL SCHOOL Attendance</h1>
+      <p class="muted">Admin login</p>
+
+      <label class="field">
+        <span class="label">Admin password</span>
+        <input id="adminPass" type="password" placeholder="Enter admin password" />
+      </label>
+
+      <div class="row">
+        <button id="loginBtn" class="btn primary">Login</button>
+        <button id="initBtn" class="btn ghost">Init / Reset (dev)</button>
+      </div>
+
+      <p id="msg" class="muted small"></p>
+    </div>
+  </main>
+
+  <script src="db.js"></script>
+  <script>
+    // simple admin password stored in localStorage (hashed string would be better)
+    if (!localStorage.getItem('fayis_admin_pass')) {
+      localStorage.setItem('fayis_admin_pass', 'admin123'); // change after first login
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', () => {
+      const p = document.getElementById('adminPass').value.trim();
+      const msg = document.getElementById('msg');
+      if (!p) { msg.textContent = 'Enter password'; return; }
+      if (p === localStorage.getItem('fayis_admin_pass')) {
+        // go to dashboard
+        window.location.href = 'dashboard.html';
+      } else {
+        msg.textContent = 'Wrong password';
+      }
+    });
+
+    // development helper: clear DB (use carefully)
+    document.getElementById('initBtn').addEventListener('click', async () => {
+      if (!confirm('Clear database (staff + attendance)?')) return;
+      await DB.deleteDatabase();
+      alert('Database cleared.');
+    });
+  </script>
+</body>
+</html>
