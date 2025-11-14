@@ -1,57 +1,36 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FATIMA YAHAYA INTERNATIONAL SCHOOL Attendance — Admin Login</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <title>Fayis Attendance System</title>
+    <link rel="stylesheet" href="styles.css">
+    <script defer src="face-api.min.js"></script>
+    <script defer src="main.js"></script>
 </head>
+
 <body>
-  <main class="center">
-    <div class="card login-card">
-      <img src="logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
-      <h1>FATIMA YAHAYA INTERNATIONAL SCHOOL Attendance</h1>
-      <p class="muted">Admin login</p>
 
-      <label class="field">
-        <span class="label">Admin password</span>
-        <input id="adminPass" type="password" placeholder="Enter admin password" />
-      </label>
+    <header class="top-header">
+        <button id="adminBtn">Admin Login</button>
+    </header>
 
-      <div class="row">
-        <button id="loginBtn" class="btn primary">Login</button>
-        <button id="initBtn" class="btn ghost">Init / Reset (dev)</button>
-      </div>
+    <div class="container">
+        <img src="logo.png" class="school-logo">
+        <h1 class="school-name">FAYIS INTERNATIONAL SCHOOL</h1>
 
-      <p id="msg" class="muted small"></p>
+        <div class="camera-box">
+            <video id="video" autoplay playsinline></video>
+        </div>
     </div>
-  </main>
 
-  <script src="db.js"></script>
-  <script>
-    // simple admin password stored in localStorage (hashed string would be better)
-    if (!localStorage.getItem('fayis_admin_pass')) {
-      localStorage.setItem('fayis_admin_pass', 'admin123'); // change after first login
-    }
+    <!-- Hidden admin login modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2>Admin Login</h2>
+            <input type="password" id="adminPass" placeholder="Enter Admin Password">
+            <button id="loginBtn">Login</button>
+        </div>
+    </div>
 
-    document.getElementById('loginBtn').addEventListener('click', () => {
-      const p = document.getElementById('adminPass').value.trim();
-      const msg = document.getElementById('msg');
-      if (!p) { msg.textContent = 'Enter password'; return; }
-      if (p === localStorage.getItem('fayis_admin_pass')) {
-        // go to dashboard
-        window.location.href = 'dashboard.html';
-      } else {
-        msg.textContent = 'Wrong password';
-      }
-    });
-
-    // development helper: clear DB (use carefully)
-    document.getElementById('initBtn').addEventListener('click', async () => {
-      if (!confirm('Clear database (staff + attendance)?')) return;
-      await DB.deleteDatabase();
-      alert('Database cleared.');
-    });
-  </script>
 </body>
 </html>
