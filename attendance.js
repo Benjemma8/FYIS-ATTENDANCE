@@ -1,98 +1,154 @@
-// Attendance capture + recognition
 const Attendance = (function(){
-  let video, canvas, stream;
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const statusBox = document.getElementById('statusBox');
+  const successOverlay = document.getElementById('successOverlay');
+  const successText = document.getElementById('successText');
+  const successSub = document.getElementById('successSub');
+  const tick = document.getElementById('tickSound');
+
+  let stream = null;
   let running = false;
+  let staffCache = []; // list of staff with descriptors
 
   async function init(){
-    video = document.getElementById('liveVideo');
-    canvas = document.getElementById('snapCanvas');
-    document.getElementById('startBtn').addEventListener('click', start);
-    document.getElementById('stopBtn').addEventListener('click', stop);
-    document.getElementById('captureNow').addEventListener('click', captureAndRecognize);
+    statusBox.textContent = 'Loading models...';
+    await DB.open();
+    await FaceAPI.loadModels();
+    staffCache = await DB.getAllStaff(); // each staff should have .descriptors (array of arrays)
+    statusBox.textContent = `Models loaded. ${staffCache.length} staff registered. Starting camera...`;
+    await startCamera();
+    startRecognitionLoop();
   }
 
-  async function start(){
+  async function startCamera(){
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       video.srcObject = stream;
       await video.play();
+      // set overlay size
+      overlay.width = video.videoWidth || 480;
+      overlay.height = video.videoHeight || 360;
+      statusBox.textContent = 'Camera started. Stand in front of camera.';
       running = true;
-      document.getElementById('startBtn').disabled = true;
-      document.getElementById('stopBtn').disabled = false;
-      document.getElementById('captureNow').disabled = false;
-      showMessage('Camera started');
-    } catch (err) {
-      alert('Cannot access camera');
+    } catch (err){
+      console.error('Camera start failed', err);
+      statusBox.textContent = 'Cannot access camera. Check permissions.';
+      running = false;
     }
   }
 
-  function stop(){
-    if (stream) {
-      stream.getTracks().forEach(t=>t.stop());
-      video.srcObject = null;
+  let busy = false;
+  async function startRecognitionLoop(){
+    const ctx = overlay.getContext('2d');
+    while (true){
+      if (!running) { await wait(500); continue; }
+      // draw minimal preview rectangle
+      ctx.clearRect(0,0,overlay.width,overlay.height);
+      // try capture and recognize (throttle to ~1.2s)
+      if (!busy){
+        busy = true;
+        try {
+          ctx.drawImage(video, 0, 0, overlay.width, overlay.height);
+          const descriptor = await FaceAPI.descriptorFromCanvas(overlay);
+          if (descriptor){
+            statusBox.textContent = 'Face detected. Checking...';
+            const match = FaceAPI.findMatch(descriptor, staffCache, 0.62);
+            if (match){
+              // found staff
+              await handleMatch(match.staff);
+            } else {
+              statusBox.textContent = 'Face not recognized. Please register.';
+            }
+          } else {
+            statusBox.textContent = 'No face detected. Adjust position.';
+          }
+        } catch (err){
+          console.error(err);
+        } finally {
+          // small delay before next attempt
+          await wait(1200);
+          busy = false;
+        }
+      }
+      await wait(300);
     }
-    running = false;
-    document.getElementById('startBtn').disabled = false;
-    document.getElementById('stopBtn').disabled = true;
-    document.getElementById('captureNow').disabled = true;
-    showMessage('Camera stopped');
   }
 
-  async function captureAndRecognize(){
-    if (!running) { alert('Start camera first'); return; }
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const descriptor = await FaceAPI.getDescriptorFromCanvas(canvas);
-    if (!descriptor) {
-      showMessage('No face detected. Try again.');
-      return;
-    }
-
-    // build labeled descriptors from DB
-    const staff = await DB.getAllStaff();
-    if (!staff.length) { alert('No staff registered'); return; }
-    const labeled = staff.map(s => ({ staffCode: s.staffCode, name: s.name, descriptors: s.descriptors }));
-    const match = FaceAPI.findBestMatch(Array.from(descriptor), labeled, 0.6);
-    const snap = canvas.toDataURL('image/jpeg', 0.9);
+  async function handleMatch(staff){
     const now = new Date();
     const date = now.toISOString().slice(0,10);
     const time = now.toTimeString().slice(0,8);
-    if (match) {
-      const staffObj = match.staff;
-      // determine status: early/on-time/late using default resumption 08:00
-      const resumption = localStorage.getItem('fayis_resumption') || '08:00';
-      const status = computeStatus(time, resumption);
-      const entry = { staffCode: staffObj.staffCode, name: staffObj.name, date, time, snapshot: snap, status, timestamp: now.toISOString() };
-      await DB.addAttendance(entry);
-      showResult(`Recognized: ${staffObj.name} (${staffObj.staffCode}) — ${status}`);
-    } else {
-      showResult('No match found');
+    // prevent duplicate for same day
+    const already = await DB.hasAttendanceToday(staff.staffCode, date);
+    if (already){
+      statusBox.textContent = `${staff.name} already marked today.`;
+      showSuccess(`${staff.name}`, `${time} — Already marked`);
+      return;
     }
-
-    // refresh dashboard ephemeral UI if open (no-op)
+    // snapshot
+    const snap = captureSnapshot();
+    // compute status (resumption default 08:00) stored in localStorage or default
+    const resumption = localStorage.getItem('fayis_resumption') || '08:00';
+    const status = computeStatus(time.slice(0,5), resumption);
+    // store attendance
+    const entry = { staffCode: staff.staffCode, name: staff.name, date, time, snapshot: snap, status, timestamp: now.toISOString() };
+    await DB.addAttendance(entry);
+    statusBox.textContent = `Attendance recorded: ${staff.name} — ${time}`;
+    showSuccess(`${staff.name}`, `${time} — ${status}`);
+    // update cache (not required)
   }
 
-  function computeStatus(timeStr, resumptionStr){
-    // timeStr "HH:MM:SS" resumption "HH:MM"
-    const t = timeStr.slice(0,5);
-    if (t < resumptionStr) return 'Early';
-    if (t === resumptionStr || (t > resumptionStr && minutesDiff(t, resumptionStr) <= 15)) return 'OnTime';
+  function captureSnapshot(){
+    const c = document.createElement('canvas');
+    c.width = overlay.width; c.height = overlay.height;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(video, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.9);
+  }
+
+  function showSuccess(name, sub){
+    successText.textContent = `GOOD MORNING ${name.toUpperCase()}`;
+    successSub.textContent = sub;
+    successOverlay.style.display = 'flex';
+    successOverlay.setAttribute('aria-hidden','false');
+    // play sound if available
+    try { tick.currentTime = 0; tick.play(); } catch(e){}
+    setTimeout(()=> {
+      successOverlay.style.display = 'none';
+      successOverlay.setAttribute('aria-hidden','true');
+    }, 2000);
+  }
+
+  function computeStatus(timeHHMM, resumption){
+    if (timeHHMM < resumption) return 'Early';
+    const diff = minutesDiff(timeHHMM, resumption);
+    if (diff <= 15 && diff >= 0) return 'OnTime';
     return 'Late';
   }
-  function minutesDiff(a, b){
+  function minutesDiff(a,b){
     const [ah,am] = a.split(':').map(Number);
     const [bh,bm] = b.split(':').map(Number);
     return (ah*60+am) - (bh*60+bm);
   }
 
-  function showMessage(msg){
-    document.getElementById('resultBox').innerHTML = `<div class="result">${msg}</div>`;
-  }
-  function showResult(msg){
-    document.getElementById('resultBox').innerHTML = `<div class="result"><strong>${msg}</strong></div>`;
-  }
+  function wait(ms){ return new Promise(r => setTimeout(r, ms)); }
 
-  return { init };
+  // attach init to window so index.html can call it after scripts loaded
+  window.AttendanceInit = init;
+  // auto-run when page loads and scripts are ready
+  window.addEventListener('load', ()=> {
+    // Slight delay to ensure face-api is ready
+    (async ()=> {
+      try {
+        await DB.open();
+        await FaceAPI.loadModels();
+        await AttendanceInit();
+      } catch(e){
+        console.error('Startup error', e);
+        statusBox.textContent = 'Startup failed. Check models or camera.';
+      }
+    })();
+  });
+  return { };
 })();

@@ -1,36 +1,81 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Fayis Attendance System</title>
-    <link rel="stylesheet" href="styles.css">
-    <script defer src="face-api.min.js"></script>
-    <script defer src="main.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FAYIS Attendance — Capture</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- face-api (must be available in project) -->
+  <script defer src="face-api.min.js"></script>
+  <script defer src="face-recognition.js"></script>
+  <script defer src="db.js"></script>
+  <script defer src="attendance.js"></script>
 </head>
-
 <body>
-
-    <header class="top-header">
-        <button id="adminBtn">Admin Login</button>
-    </header>
-
-    <div class="container">
-        <img src="logo.png" class="school-logo">
-        <h1 class="school-name">FAYIS INTERNATIONAL SCHOOL</h1>
-
-        <div class="camera-box">
-            <video id="video" autoplay playsinline></video>
-        </div>
+  <header class="top-header">
+    <div class="header-left">
+      <img src="logo.png" class="logo" alt="logo" onerror="this.style.display='none'">
+      <div class="school-name">FAYIS INTERNATIONAL SCHOOL</div>
     </div>
-
-    <!-- Hidden admin login modal -->
-    <div id="loginModal" class="modal">
-        <div class="modal-content">
-            <h2>Admin Login</h2>
-            <input type="password" id="adminPass" placeholder="Enter Admin Password">
-            <button id="loginBtn">Login</button>
-        </div>
+    <div class="header-right">
+      <!-- hidden admin button -->
+      <button id="adminBtn" class="admin-btn" title="Admin">Admin</button>
     </div>
+  </header>
 
+  <main class="main-wrap">
+    <div class="hero">
+      <h1 class="title">Welcome — Stand before the camera</h1>
+      <p class="subtitle">Attendance will be captured automatically</p>
+
+      <div class="cam-frame">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay" class="overlay"></canvas>
+      </div>
+
+      <div id="statusBox" class="status-box muted">Initializing camera and models…</div>
+    </div>
+  </main>
+
+  <!-- Full-screen success overlay -->
+  <div id="successOverlay" class="success-overlay" aria-hidden="true">
+    <div class="success-card">
+      <div class="success-text" id="successText">GOOD MORNING</div>
+      <div class="success-sub" id="successSub">John Doe — 07:42 AM</div>
+    </div>
+  </div>
+
+  <!-- Admin login modal hidden -->
+  <div id="adminModal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <h3>Admin Login</h3>
+      <input id="adminPass" type="password" placeholder="Enter admin password" />
+      <div class="row" style="margin-top:12px">
+        <button id="adminLogin" class="btn primary">Login</button>
+        <button id="adminCancel" class="btn ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="tickSound" src="tick.mp3" preload="auto"></audio>
+
+  <script>
+    // admin button behaviour
+    document.getElementById('adminBtn').addEventListener('click', () => {
+      document.getElementById('adminModal').style.display = 'flex';
+      document.getElementById('adminModal').setAttribute('aria-hidden','false');
+    });
+    document.getElementById('adminCancel').addEventListener('click', ()=> {
+      document.getElementById('adminModal').style.display = 'none';
+      document.getElementById('adminModal').setAttribute('aria-hidden','true');
+    });
+    document.getElementById('adminLogin').addEventListener('click', ()=>{
+      const p = document.getElementById('adminPass').value;
+      if (p === localStorage.getItem('fayis_admin_pass') || p === 'admin123') {
+        // go to dashboard
+        window.location.href = 'dashboard.html';
+      } else alert('Wrong password');
+    });
+  </script>
 </body>
 </html>

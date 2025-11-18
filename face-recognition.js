@@ -1,36 +1,22 @@
-// face-api wrapper using face-api.js (which uses tfjs under the hood).
-// You MUST download the model files and put them in /models directory:
-// - face_recognition_model-weights_manifest.json (+ shard files)
-// - face_landmark_68_model-weights_manifest.json
-// - tiny_face_detector_model-weights_manifest.json
-// Download from https://github.com/justadudewhohacks/face-api.js-models or the face-api repo
-//
-// Usage: await FaceAPI.loadModels(); then FaceAPI.detectSingleDescriptorFromVideo(video)
-
 const FaceAPI = (function(){
+  let modelsLoaded = false;
+
   async function loadModels(){
-    // models must be in ./models
+    if (modelsLoaded) return;
+    // models must be at /models
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
       faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
       faceapi.nets.faceRecognitionNet.loadFromUri('/models')
     ]);
-    console.log('face-api models loaded');
+    modelsLoaded = true;
+    console.log('face models loaded');
   }
 
-  async function getDescriptorFromImage(imgElement){
-    const detection = await faceapi.detectSingleFace(imgElement, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-    return detection ? detection.descriptor : null;
-  }
-
-  async function getDescriptorFromCanvas(canvas){
-    const detection = await faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-    return detection ? detection.descriptor : null;
-  }
-
-  async function getDescriptorFromVideo(videoEl){
-    const detection = await faceapi.detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-    return detection ? detection.descriptor : null;
+  // returns descriptor Float32Array or null
+  async function descriptorFromCanvas(canvas){
+    const det = await faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+    return det ? det.descriptor : null;
   }
 
   function euclideanDistance(a, b){
@@ -42,18 +28,20 @@ const FaceAPI = (function(){
     return Math.sqrt(sum);
   }
 
-  function findBestMatch(descriptor, labeledDescriptors, threshold = 0.6){
-    // labeledDescriptors = [{ staffCode, name, descriptors: [Float32Array...]}]
-    let best = { label: null, distance: Infinity, staff: null };
-    for (const staff of labeledDescriptors) {
-      for (const d of staff.descriptors){
+  // staffList: [{ staffCode, name, descriptors: [Array,...], images: [...] }]
+  function findMatch(descriptor, staffList, threshold = 0.62){
+    if (!descriptor || !staffList || !staffList.length) return null;
+    let best = { staff: null, distance: Infinity };
+    for (const s of staffList){
+      if (!s.descriptors) continue;
+      for (const d of s.descriptors){
         const dist = euclideanDistance(d, descriptor);
-        if (dist < best.distance) { best.distance = dist; best.label = staff.staffCode; best.staff = staff; }
+        if (dist < best.distance){ best.distance = dist; best.staff = s; }
       }
     }
-    if (best.distance <= threshold) return best;
+    if (best.distance <= threshold) return { staff: best.staff, distance: best.distance };
     return null;
   }
 
-  return { loadModels, getDescriptorFromImage, getDescriptorFromVideo, findBestMatch, euclideanDistance, getDescriptorFromCanvas };
+  return { loadModels, descriptorFromCanvas, findMatch };
 })();
